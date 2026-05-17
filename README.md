@@ -15,15 +15,15 @@ Este repositorio contiene la arquitectura y el ambiente Docker para la base de d
    ```
 2. El proceso levantará PostgreSQL, cargará toda la data, arrancará Metabase y ejecutará el setup automático para enlazar la base de datos y crear el usuario administrador.
 3. Ingresa a **http://localhost:3000**.
-4. **Credenciales del evaluador:**
-   - **Correo:** `evaluador@retailmax.com`
-   - **Clave:** `Password123!`
+4. **Credenciales de calificación:**
+   - **Correo:** `calificar@uvg.edu.gt`
+   - **Clave:** `secret123+`
 
 ---
 
-## Indicadores SQL a configurar en Metabase
+## Indicadores SQL (Asignación: Ángel Sanabria)
 
-Una vez dentro de Metabase, debes crear las siguientes 3 preguntas usando **SQL Nativo**.
+Una vez dentro de Metabase, se configurarán los siguientes 3 indicadores (1, 2 y 3) usando **SQL Nativo**.
 
 ### 1. Evolución de Ingresos Mensuales por Canal
 - **Qué representa:** El total monetario de ventas efectivas (descontando el porcentaje de descuento de cada producto) agrupado por mes y separado por compras en tienda física vs. online.

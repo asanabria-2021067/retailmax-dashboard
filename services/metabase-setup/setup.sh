@@ -27,9 +27,9 @@ RESPONSE=$(curl -s -X POST http://metabase:3000/api/setup \
     "token": "'"$TOKEN"'",
     "user": {
       "first_name": "Admin",
-      "last_name": "Evaluador",
-      "email": "evaluador@retailmax.com",
-      "password": "Password123!",
+      "last_name": "Calificador",
+      "email": "calificar@uvg.edu.gt",
+      "password": "secret123+",
       "site_name": "RetailMax Analytics"
     },
     "prefs": {

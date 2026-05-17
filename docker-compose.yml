@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: retailmax_db
+    environment:
+      POSTGRES_DB: retailmax
+      POSTGRES_USER: rm_user
+      POSTGRES_PASSWORD: rm_password
+    volumes:
+      - ./services/database/init-scripts:/docker-entrypoint-initdb.d
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rm_user -d retailmax"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  metabase:
+    image: metabase/metabase:v0.48.8
+    container_name: retailmax_metabase
+    ports:
+      - "3000:3000"
+    volumes:
+      - metabase-data:/metabase-data
+    environment:
+      MB_DB_FILE: /metabase-data/metabase.db
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  metabase-setup:
+    build: ./services/metabase-setup
+    container_name: retailmax_setup
+    depends_on:
+      - metabase
+
+volumes:
+  pgdata:
+  metabase-data:

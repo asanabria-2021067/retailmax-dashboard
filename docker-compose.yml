@@ -11,8 +11,6 @@ services:
     volumes:
       - ./services/database/init-scripts:/docker-entrypoint-initdb.d
       - pgdata:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U rm_user -d retailmax"]
       interval: 10s
@@ -23,7 +21,7 @@ services:
     image: metabase/metabase:v0.48.8
     container_name: retailmax_metabase
     ports:
-      - "3000:3000"
+      - "3005:3000"
     volumes:
       - ./metabase-data:/metabase-data
     environment:

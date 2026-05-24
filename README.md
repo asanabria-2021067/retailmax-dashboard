@@ -14,7 +14,7 @@ Este repositorio contiene la arquitectura y el ambiente Docker para la base de d
    docker compose up -d --build
    ```
 2. El proceso levantará PostgreSQL, cargará toda la data, arrancará Metabase y ejecutará el setup automático para enlazar la base de datos y crear el usuario administrador.
-3. Ingresa a **http://localhost:3000**.
+3. Ingresa a **http://localhost:3005**.
 4. **Credenciales de calificación:**
    - **Correo:** `calificar@uvg.edu.gt`
    - **Clave:** `secret123+`
@@ -180,7 +180,93 @@ GROUP BY t.id_tienda, t.nombre, t.region
 ORDER BY indice_quiebre_porcentaje DESC;
 ```
 
-## Tab 2 — Proveedores y Abastecimiento (Dereck y Alejandro)
+## Tab 2 — Proveedores y Abastecimiento (Derek y Alejandro)
+
+### Indicadores SQL (Asignación: Derek Coronado)
+
+Una vez dentro de Metabase, se configurarán los siguientes 3 indicadores (7, 8 y 9) usando **SQL Nativo**.
+
+#### 7. Tasa de Devolución por Proveedor
+- **Descripción:** Muestra el porcentaje de líneas de venta completadas que resultaron en devolución, agrupado por proveedor. Permite identificar qué proveedores generan más problemas de calidad y orientar negociaciones o decisiones de renovación de contrato.
+- **Qué representa:** Para cada proveedor, calcula el porcentaje de líneas de venta completadas que resultaron en una devolución. Relaciona las ventas de productos de cada proveedor con las devoluciones registradas para esos mismos productos y pedidos.
+- **Por qué es importante:** Permite identificar qué proveedores están generando más problemas de calidad o inconformidades en el cliente final. Un proveedor con alta tasa de devolución representa un riesgo operativo y financiero: genera costos de reembolso, afecta la satisfacción del cliente y puede saturar el proceso de logística inversa. Este indicador orienta las negociaciones de calidad y las decisiones de renovación de contratos con proveedores.
+- **Visualización usada y justificación:** **Gráfico de barras horizontales ordenado de mayor a menor tasa**. Permite comparar de un vistazo qué proveedores tienen problemas de calidad, con los nombres legibles en el eje Y y el porcentaje de devolución en el eje X.
+- **Query SQL:**
+```sql
+SELECT
+    pv.nombre                                AS proveedor,
+    pv.pais,
+    pv.calificacion,
+    COUNT(DISTINCT dp.id_detalle)            AS lineas_vendidas,
+    COUNT(DISTINCT d.id_devolucion)          AS total_devoluciones,
+    ROUND(
+        COUNT(DISTINCT d.id_devolucion)::NUMERIC
+        / NULLIF(COUNT(DISTINCT dp.id_detalle), 0) * 100
+    , 2)                                     AS tasa_devolucion_porcentaje
+FROM proveedor pv
+JOIN producto pr        ON pv.id_proveedor = pr.id_proveedor
+JOIN detalle_pedido dp  ON pr.id_producto  = dp.id_producto
+JOIN pedido p           ON dp.id_pedido    = p.id_pedido
+LEFT JOIN devolucion d  ON d.id_pedido     = p.id_pedido
+                       AND d.id_producto   = dp.id_producto
+WHERE p.estado = 'completado'
+GROUP BY pv.id_proveedor, pv.nombre, pv.pais, pv.calificacion
+ORDER BY tasa_devolucion_porcentaje DESC;
+```
+
+#### 8. Valor del Inventario en Stock por Proveedor
+- **Descripción:** Calcula el capital inmovilizado en inventario por proveedor, mostrando el valor a precio de costo, el valor potencial de venta y la ganancia potencial si se vendiera todo el stock actual. Apoya decisiones de compra y gestión del capital de trabajo.
+- **Qué representa:** Para cada proveedor, muestra cuántas unidades de sus productos están actualmente en stock en todas las tiendas, el valor total a costo de adquisición, el valor potencial de venta y la ganancia potencial que representa ese inventario si se vendiera completamente.
+- **Por qué es importante:** Operaciones necesita saber cuánto capital está inmovilizado en inventario por proveedor. Un proveedor con mucho valor en stock pero bajo ritmo de ventas representa un riesgo de sobreinventario; uno con poco stock y alta rotación puede estar limitando las ventas. Este indicador apoya decisiones de compra, negociación de volúmenes y gestión del capital de trabajo.
+- **Visualización usada y justificación:** **Gráfico de barras verticales agrupadas** con dos series: valor a costo y valor potencial de venta, ordenado por valor a costo descendente. Permite ver qué tanto capital representa cada proveedor y cuál es el margen total en inventario.
+- **Query SQL:**
+```sql
+SELECT
+    pv.nombre                                        AS proveedor,
+    pv.pais,
+    pv.tiempo_entrega_dias,
+    COUNT(DISTINCT pr.id_producto)                   AS productos_con_stock,
+    SUM(i.stock_actual)                              AS unidades_en_stock,
+    ROUND(SUM(i.stock_actual * pr.precio_costo), 2)  AS valor_costo_total,
+    ROUND(SUM(i.stock_actual * pr.precio_venta), 2)  AS valor_venta_potencial,
+    ROUND(
+        SUM(i.stock_actual * pr.precio_venta)
+        - SUM(i.stock_actual * pr.precio_costo)
+    , 2)                                             AS ganancia_potencial
+FROM proveedor pv
+JOIN producto   pr ON pv.id_proveedor = pr.id_proveedor
+JOIN inventario i  ON pr.id_producto  = i.id_producto
+GROUP BY pv.id_proveedor, pv.nombre, pv.pais, pv.tiempo_entrega_dias
+ORDER BY valor_costo_total DESC;
+```
+
+#### 9. Riesgo de Desabasto por Proveedor
+- **Descripción:** Combina el porcentaje de productos en stock crítico (stock actual ≤ mínimo) con los días promedio sin reposición y el tiempo de entrega del proveedor. Permite priorizar a qué proveedor contactar primero para evitar quiebres de inventario.
+- **Qué representa:** Combina dos dimensiones de riesgo por proveedor: el porcentaje de sus productos que están en stock crítico (stock actual ≤ stock mínimo) y los días promedio transcurridos desde la última reposición de sus productos. También muestra cuántos productos tienen stock cero y el tiempo de entrega del proveedor, que determina cuánto tardaría en resolver el problema.
+- **Por qué es importante:** Logística necesita priorizar a qué proveedores contactar primero para reabastecer. Un proveedor con muchos productos en stock crítico, muchos días sin reposición y tiempo de entrega largo representa el mayor riesgo operativo: si no se actúa ahora, habrá quiebres de stock antes de que llegue el próximo pedido. Este indicador permite una acción proactiva y orientada al riesgo real.
+- **Visualización usada y justificación:** **Tabla ordenada por porcentaje de stock crítico descendente**. La tabla es la visualización ideal porque este indicador tiene múltiples columnas accionables (productos críticos, días sin reposición, tiempo de entrega) que el equipo de logística necesita leer de forma simultánea para tomar decisiones.
+- **Query SQL:**
+```sql
+SELECT
+    pv.nombre                                                            AS proveedor,
+    pv.tiempo_entrega_dias,
+    COUNT(DISTINCT pr.id_producto)                                       AS total_productos,
+    SUM(CASE WHEN i.stock_actual = 0 THEN 1 ELSE 0 END)                 AS productos_sin_stock,
+    SUM(CASE WHEN i.stock_actual <= i.stock_minimo THEN 1 ELSE 0 END)   AS productos_stock_critico,
+    ROUND(
+        SUM(CASE WHEN i.stock_actual <= i.stock_minimo THEN 1 ELSE 0 END)::NUMERIC
+        / NULLIF(COUNT(DISTINCT pr.id_producto), 0) * 100
+    , 2)                                                                 AS porcentaje_stock_critico,
+    ROUND(AVG(CURRENT_DATE - i.ultima_reposicion), 0)                   AS dias_prom_sin_reposicion
+FROM proveedor pv
+JOIN producto   pr ON pv.id_proveedor = pr.id_proveedor
+JOIN inventario i  ON pr.id_producto  = i.id_producto
+WHERE i.ultima_reposicion IS NOT NULL
+GROUP BY pv.id_proveedor, pv.nombre, pv.tiempo_entrega_dias
+ORDER BY porcentaje_stock_critico DESC, dias_prom_sin_reposicion DESC;
+```
+
+---
 
 ### Indicadores SQL (Asignación: Alejandro Jerez)
 

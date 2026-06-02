@@ -21,6 +21,8 @@ Este repositorio contiene la arquitectura y el ambiente Docker para la base de d
 
 ## Video
 
+Link al video explicativo:
+
 https://youtu.be/QN_tJyS5lkw
 
 ---

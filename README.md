@@ -19,6 +19,10 @@ Este repositorio contiene la arquitectura y el ambiente Docker para la base de d
    - **Correo:** `calificar@uvg.edu.gt`
    - **Clave:** `secret123+`
 
+## Video
+
+https://youtu.be/QN_tJyS5lkw
+
 ---
 ## Tab 1 — Inventario y Disponibilidad (Ángel y Vernel)
 
